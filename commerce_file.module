@@ -1,0 +1,64 @@
+<?php
+
+use Drupal\file\Entity\File;
+
+/**
+ * Implement hook_file_access
+ */
+function commerce_file_file_access(\Drupal\Core\Entity\EntityInterface $entity, $operation, \Drupal\Core\Session\AccountInterface $account) {
+
+    if ($operation == 'download' || $operation == 'view') {
+      
+      $fid = $entity->id();
+      $uid = $account->id();
+  
+    $file = File::load($fid);
+    $user_check = false;
+
+    /// Test if the user's id = the file owners id
+    if ($file->getOwnerId() !== null) {
+      $file_user = $file->getOwnerId();
+      $user_check = ($file_user == $uid) ? true : false;
+    }
+
+    $license = _check_commerce_file_license($fid, $uid);
+
+    if ($user_check || \Drupal::currentUser()->id() == 1 || $license) {
+
+      return \Drupal\Core\Access\AccessResult::allowed();
+
+    } else {
+
+      return \Drupal\Core\Access\AccessResult::forbidden();
+
+    }
+    }
+  }
+  
+  
+  function _check_commerce_file_license($fid, $uid) {
+      $query = \Drupal::entityQuery('commerce_license')
+          ->condition('uid', $uid)
+          ->condition('license_image', $fid);
+
+      $result = $query->execute();
+
+      return $result;
+    }
+
+/**
+* Implements hook_mail().
+*/
+function commerce_file_mail($key, &$message, $params) {
+  $options = array(
+    'langcode' => $message['langcode'],
+  );
+  switch ($key) {
+    case 'file_download_link':
+      $message['from'] = \Drupal::config('system.site')->get('mail');
+      $message['subject'] = t('File Download');
+      $message['body'][] = $params['message'];
+      break;
+  }
+ }
+ 
